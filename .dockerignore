@@ -1,0 +1,12 @@
+.venv/
+.git/
+__pycache__/
+*.py[cod]
+*.db
+*.sqlite3
+*.log
+.scrapy/
+test_books.json
+books.json
+books.csv
+books.xml
