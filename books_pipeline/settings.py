@@ -60,6 +60,7 @@ DOWNLOAD_DELAY = 1
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
     "books_pipeline.pipelines.BooksPipeline": 300,
+    "books_pipeline.pipelines.SQLitePipeline": 400,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
@@ -85,3 +86,18 @@ ITEM_PIPELINES = {
 
 # Set settings whose default value is deprecated to a future-proof value
 FEED_EXPORT_ENCODING = "utf-8"
+
+FEEDS = {
+    "books.json": {
+        "format": "json",
+        "overwrite": True,
+    },
+    "books.csv": {
+        "format": "csv",
+        "overwrite": True,
+    },
+    "books.xml": {
+        "format": "xml",
+        "overwrite": True,
+    },
+}
