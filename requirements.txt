@@ -34,7 +34,9 @@ queuelib==1.10.0
 requests==2.34.2
 requests-file==3.0.1
 Scrapy==2.19.0
+scrapyd==1.6.0
 service-identity==26.1.0
+setuptools==80.10.2
 tldextract==5.4.0
 Twisted==26.4.0
 typing_extensions==4.16.0
