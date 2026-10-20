@@ -9,9 +9,10 @@ class BooksSpider(scrapy.Spider):
     name = "books"
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
+    categories_to_select = 7
 
     def parse(self, response):
-        """Discover categories and inspect their book listings."""
+        """Discover all categories and randomly select 5–10."""
         links = response.css("ul.nav-list ul li a")
 
         categories = [
@@ -24,12 +25,19 @@ class BooksSpider(scrapy.Spider):
             for link in links
         ]
 
+        if not categories:
+            self.logger.error("No categories were discovered.")
+            return
+
+        count = min(self.categories_to_select, len(categories))
+        selected = random.sample(categories, count)
+
         self.category_book_urls = {
             category["url"]: {
                 "name": category["name"],
                 "urls": [],
             }
-            for category in categories
+            for category in selected
         }
 
         self.pending_categories = set(
@@ -37,11 +45,12 @@ class BooksSpider(scrapy.Spider):
         )
 
         self.logger.info(
-            "Discovered %d categories. Inspecting all listings.",
+            "Discovered %d categories; randomly selected %d.",
             len(categories),
+            count,
         )
 
-        for category in categories:
+        for category in selected:
             yield response.follow(
                 category["url"],
                 callback=self.parse_category,
@@ -49,16 +58,16 @@ class BooksSpider(scrapy.Spider):
             )
 
     def parse_category(self, response):
-        """Collect book URLs across every page of a category."""
+        """Collect all available books and sample up to five."""
         category_url = response.meta["category_url"]
         category = self.category_book_urls[category_url]
 
-        book_links = response.css(
+        links = response.css(
             "article.product_pod h3 a::attr(href)"
         ).getall()
 
         category["urls"].extend(
-            response.urljoin(url) for url in book_links
+            response.urljoin(url) for url in links
         )
 
         next_page = response.css(
@@ -78,40 +87,22 @@ class BooksSpider(scrapy.Spider):
         if self.pending_categories:
             return
 
-        eligible = [
-            category
-            for category in self.category_book_urls.values()
-            if len(category["urls"]) >= 5
-        ]
-
-        if len(eligible) < 5:
-            self.logger.error(
-                "Only %d eligible categories found.",
-                len(eligible),
-            )
-            return
-
-        count = random.randint(5, min(10, len(eligible)))
-        selected = random.sample(eligible, count)
-
-        self.logger.info(
-            "Inspected %d categories; %d have at least 5 books. "
-            "Selected %d eligible categories.",
-            len(self.category_book_urls),
-            len(eligible),
-            count,
-        )
-
-        for category in selected:
-            selected_urls = random.sample(category["urls"], 5)
+        for category in self.category_book_urls.values():
+            available = category["urls"]
+            sample_size = min(5, len(available))
 
             self.logger.info(
-                "Category '%s': collected %d books; selected 5.",
+                "Category '%s': %d books available; selecting %d.",
                 category["name"],
-                len(category["urls"]),
+                len(available),
+                sample_size,
             )
 
-            for url in selected_urls:
+            selected_books = random.sample(
+                available, sample_size
+            )
+
+            for url in selected_books:
                 yield scrapy.Request(
                     url,
                     callback=self.parse_book,
