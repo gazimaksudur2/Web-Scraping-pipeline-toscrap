@@ -1,0 +1,13 @@
+services:
+  scrapyd:
+    build: .
+    container_name: books-scrapyd
+    ports:
+      - "127.0.0.1:6800:6800"
+    volumes:
+      - scrapyd-data:/var/lib/scrapyd
+      - ./books.db:/app/books.db
+    restart: unless-stopped
+
+volumes:
+  scrapyd-data:
