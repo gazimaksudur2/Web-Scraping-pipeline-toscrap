@@ -22,7 +22,7 @@ A modular Scrapy application that discovers book categories dynamically from [Bo
 
 ## Project overview
 
-The project demonstrates an end-to-end web-scraping workflow using Scrapy and Python. It starts from the website homepage, discovers category names and URLs dynamically, randomly selects between five and ten categories from all discovered categories, follows pagination for each selected category, and selects up to five distinct books from each selected category. If a category contains fewer than five books, every available book in that category is selected.
+The project demonstrates an end-to-end web-scraping workflow using Scrapy and Python. It starts from the website homepage, discovers category names and URLs dynamically, randomly selects exactly seven categories from all discovered categories, follows pagination for each selected category, and selects up to five distinct books from each selected category. If a category contains fewer than five books, every available book in that category is selected.
 
 The spider extracts book details and passes every item through Scrapy Item Pipelines for normalization and SQLite insertion. Scrapy Feed Exports produce JSON, CSV, and XML files.
 
@@ -32,7 +32,7 @@ The spider extracts book details and passes every item through Scrapy Item Pipel
 
 - Dynamic category discovery; category names and URLs are not hardcoded.
 - Category pagination handled by following each page's `next` link.
-- Random selection of 5–10 categories from all dynamically discovered categories, without filtering by category size.
+- Fixed-size category sampling: exactly 7 categories are selected randomly from all dynamically discovered categories; category size does not affect eligibility.
 - Random selection of up to five distinct books per selected category; categories with fewer than five books contribute all available books.
 - Extraction of title, numeric price, availability Boolean, product URL, image URL, and category.
 - Item cleaning and normalization through a Scrapy pipeline.
@@ -77,7 +77,7 @@ Books to Scrape homepage
 BooksSpider: discover category links dynamically
           |
           v
-Randomly select 5–10 categories from all discovered categories
+Randomly select exactly 7 categories from all discovered categories
           |
           v
 Visit selected category listings and follow pagination
@@ -175,7 +175,7 @@ scrapy list
 scrapy crawl books
 ```
 
-Scrapy discovers categories from the homepage on each run and randomly selects between five and ten of them without checking category size first. It follows pagination for each selected category, then selects `min(5, available books)` distinct books. A category with one to four books contributes all of its books; an empty category contributes no book records.
+Scrapy discovers categories from the homepage on each run and randomly selects exactly seven of them without checking category size first. It follows pagination for each selected category, then selects `min(5, available books)` distinct books. A category with one to four books contributes all of its books; an empty category contributes no book records.
 
 To write the feed exports explicitly, use:
 
@@ -214,7 +214,7 @@ print("Records per category:", dict(collections.Counter(row["category"] for row 
 PY
 ```
 
-The total number of records varies between runs because both the selected categories and their available book counts vary. Categories with at least five books contribute five records; categories with fewer than five books contribute their available number. Therefore, the total is not necessarily a multiple of five.
+The total number of records varies between runs because the seven selected categories vary and each category may contain a different number of books. Categories with at least five books contribute five records; categories with fewer than five books contribute all available books. Therefore, the total is not necessarily a multiple of five.
 
 ## Database configuration
 
@@ -331,19 +331,18 @@ The following checks have been performed during development:
 
 - The homepage returned HTTP 200 and the category selector discovered 50 category links dynamically.
 - Category pagination was tested using a multi-page category.
-- The earlier implementation was tested with category eligibility filtering and completed a crawl. The sampling policy is being changed so categories are selected randomly from all discovered categories and contribute up to five available books. Re-run local validation after applying that code change.
+- The final sampling policy was verified through Scrapyd: the deployed spider logged `Discovered 50 categories; randomly selected 7.` It selected six categories with five books each and one category (`Health`) with four books, producing 34 items.
 - A local crawl produced JSON, CSV, and XML exports with matching record counts and all six required fields.
-- SQLite storage was checked for matching record counts and category counts for a tested crawl; repeat this check after applying the revised sampling policy.
+- SQLite schema and persistence were verified during an earlier deployed run. The latest 34-item Scrapyd run's log confirms the three feed counts; check the database row count separately if reporting exact SQLite parity for that run.
 - Docker and Docker Compose configuration were validated, and the Scrapyd service responded on port 6800.
 - The project was deployed to Scrapyd; the API listed the `books` spider and successfully scheduled a crawl.
-- A Scrapyd job finished with 35 scraped items, and the job log confirmed that all three feed exporters stored 35 items. The container's SQLite database was also checked and contained 35 records with the expected columns.
 
 Re-run the validation commands after code or configuration changes; the random selection means each crawl can produce a different number of records.
 
 ## Design decisions
 
 - **Dynamic discovery:** Category names and links are extracted from the homepage rather than maintained in code.
-- **Random category sampling:** Between five and ten categories are sampled randomly from all categories discovered on the homepage; category size does not affect eligibility for selection.
+- **Random category sampling:** Exactly seven categories are sampled randomly from all categories discovered on the homepage; category size does not affect eligibility for selection.
 - **Pagination-aware collection:** Each selected category listing is followed until no next-page link remains, so book sampling is not restricted to the first page.
 - **Availability-aware book sampling:** Each selected category contributes up to five distinct books. If fewer than five are available, all available books are selected.
 - **Separation of responsibilities:** The spider handles navigation and extraction; the item class defines the record structure; pipelines clean values and persist records; settings define feeds and pipeline order.
@@ -352,7 +351,7 @@ Re-run the validation commands after code or configuration changes; the random s
 
 ## Known limitations
 
-- Random selection means each crawl can return a different total number of records. The number depends on the 5–10 randomly selected categories and how many books each selected category contains.
+- Exactly seven categories are selected per crawl, but the selected categories vary randomly. The total record count depends on how many books are available in those seven categories, because each contributes up to five books.
 - Only the randomly selected categories are crawled for their full listings and pagination; this avoids scanning every category on each run.
 - SQLite is configured to replace the previous crawl's rows. It is intended for this assignment's latest-run dataset, not concurrent jobs or historical storage.
 - The current Compose configuration persists `books.db` on the host, but feed exports generated by a Scrapyd job are written inside the container unless copied out. A dedicated host-mounted output directory would be a useful improvement.
